@@ -1,0 +1,123 @@
+* Overview
+
+This program provides a command-line interface for managing software packages. It supports operations such as installing, uninstalling, listing installed packages, cloning repositories, and syncing repositories. The program reads package information from JSON files and executes scripts for installation and uninstallation.
+
+* Usage
+
+#+BEGIN_SRC sh
+go run main.go [options]
+#+END_SRC
+
+* Options
+
+- `-a <pkg>`: Installs the specified package.
+- `-s`: Installs the package system-wide.
+- `-u <user>`: Installs the package for a specific user.
+- `-l`: Lists installed packages.
+- `-e <repoURL>`: Clones a repository.
+- `-sync`: Syncs the repository.
+- `-repos <path>`: Path to the list of repositories to sync.
+
+* Example
+
+#+BEGIN_SRC sh
+To install a package system-wide:
+go run main.go -a mypackage -s
+
+To list installed packages:
+go run main.go -l
+
+To clone a repository:
+go run main.go -e https://github.com/user/repo.git
+#+END_SRC
+
+* Implementation Details
+
+**PackageInfo and Repository Structs**: Define the structure of package and repository information, including dependencies, installation scripts, and paths.
+
+**readRepositories**: Reads repository information from a JSON file.
+
+**installPackage**: Installs a package by executing its installation script and updating the system's PATH.
+
+**listUsersWithHome**: Lists users with home directories.
+
+**appendToShellConfig**: Appends a path to a shell configuration file.
+
+**uninstallPackage**: Uninstalls a package by removing its directory and updating the system's PATH.
+
+**listPackages**: Lists installed packages.
+
+**cloneRepo**: Clones a repository from a given URL.
+
+**syncRepo**: Syncs a repository by pulling the latest changes.
+
+* Dependencies
+
+- Go standard library packages for file operations, JSON parsing, command execution, and more.
+
+* Contributing
+
+Contributions are welcome. Please submit pull requests or open issues for any improvements or bug fixes.
+
+
+* Developing Packages
+
+Developing packages involves creating a `package.json` file that describes the package and an `install.sh` script that defines how the package should be installed. Below is an example of how these files might be structured for a package named `neofetch`.
+
+**Example `package.json` for `neofetch`**
+
+#+BEGIN_SRC json
+{
+    "name": "example",
+    "version": "1.0.0",
+    "dependencies": [],
+    "install_script": "./install.sh",
+    "installed_path": "/packages/store/example"
+}
+#+END_SRC
+
+This JSON file specifies the package name, version, dependencies (if any), the path to the installation script, and the path where the package should be installed.
+
+**Example `install.sh` for `neofetch`**
+
+#+BEGIN_SRC sh
+#!/bin/bash
+
+# Load the installed_path from package.json
+package_json_path=$1
+package_dir=$2
+# Use jq to extract the installed_path from package.json
+export INSTALLED_PATH=$(jq -r '.installed_path' $package_json_path)
+
+# Define the GitHub repository details
+OWNER="dylanaraps"
+REPO="neofetch"
+REF="master"
+export TEMP_DIR=/tmp/$REPO
+mkdir -p $TEMP_DIR
+# Download the tarball from GitHub
+curl -L "https://api.github.com/repos/$OWNER/$REPO/tarball/$REF" -o package.tar.gz
+
+# Extract the tarball to the installed_path
+tar -xzf package.tar.gz -C "$TEMP_DIR"/ --strip-components=1
+
+# Change directory to the extracted project
+cd $TEMP_DIR
+
+# Run make to build the project
+make
+
+# Move the binaries to the installed_path
+# Assuming the binaries are in a directory named 'bin'
+mv $TEMP_DIR/neofetch "$INSTALLED_PATH"
+
+# Clean up the downloaded tarball and the temporary directory
+rm -rf "$TEMP_DIR"
+#rm $package_dir/package.tar.gz
+#+END_SRC
+
+This script demonstrates how to download a package from GitHub, extract it, build it, and move the built binaries to the specified installation path. It uses `jq` to parse the `package.json` file for the installation path and `curl` to download the package tarball.
+
+**Note:** Ensure that `jq` is installed on your system to parse JSON files in the shell script.
+
+Developing packages in this manner allows for a standardized approach to package management, making it easier to install, update, and manage software packages across different systems.
