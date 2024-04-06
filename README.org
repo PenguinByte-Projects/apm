@@ -1,6 +1,6 @@
 * Overview
 
-This program provides a command-line interface for managing software packages. It supports operations such as installing, uninstalling, listing installed packages, cloning repositories, and syncing repositories. The program reads package information from JSON files and executes scripts for installation and uninstallation.
+This program provides a command-line interface for managing software packages. It supports operations such as installing, removing, and listing packages, adding repositories, and syncing repositories. The program reads package information from JSON files and executes scripts for installation and uninstallation.
 
 * Usage
 
@@ -14,7 +14,7 @@ go run main.go [options]
 - `-s`: Installs the package system-wide.
 - `-u <user>`: Installs the package for a specific user.
 - `-l`: Lists installed packages.
-- `-e <repoURL>`: Clones a repository.
+- `-e <repoURL>`: Adds a repository.
 - `-sync`: Syncs the repository.
 - `-repos <path>`: Path to the list of repositories to sync.
 
@@ -27,7 +27,7 @@ go run main.go -a mypackage -s
 To list installed packages:
 go run main.go -l
 
-To clone a repository:
+To add a repository:
 go run main.go -e https://github.com/user/repo.git
 #+END_SRC
 
