@@ -33,10 +33,7 @@ avpkg -d uses:
 -d ::: Downgrades system by 1 major version if possible (Windfall v1 <- Windfall v2)
 -d <pkg> ::: Downgrades specified package(s)
 ---
-avpkg dnu uses:
-dnu ::: Lists packages on do-not-update list
-dnu -a <pkg> ::: Adds package(s) to do-not-update list
-dnu -r <pkg> ::: Removes package(s) from do-not-update list
+avpkg dnu ::: Opens do-not-update list editor
 ---
 avpkg -s ::: Searches repos for package(s)
 ---
