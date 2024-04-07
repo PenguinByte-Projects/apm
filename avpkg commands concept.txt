@@ -1,0 +1,43 @@
+avpkg commands (concept):
+
+avpkg -h, avpkg --help ::: Show options
+---
+avpkg -v, avpkg --version ::: Show version info
+---
+avpkg -e ::: Edit repos
+---
+avpkg -l ::: Lists installed packages
+---
+avpkg -i uses:
+-i ::: Shows system info
+-i <pkg> ::: Shows info about system or package(s)
+---
+avpkg -a uses:
+-a <pkg> ::: Installs package(s)
+-a <pkg> -v <ver> ::: Installs specified version of package(s)
+-a -sw <pkg> ::: Only available as administrator | Installs package(s) for the logged in administrator and users managed by current administrator
+---
+avpkg -t /<filepath>/<pkg.tar> ::: Installs tar package(s)
+---
+avpkg -r uses:
+-r ::: Removes unnecessary packages and dependencies
+-r <pkg> ::: Removes package(s)
+-r <pkg> -v <ver> ::: Removes specified version of package(s) if multiple versions of the same package are installed on the system
+---
+avpkg -u uses:
+-u ::: Updates system and packages
+-u <pkg> ::: Updates specified package(s)
+-u -m ::: Applies major system upgrades (Windfall v1 -> Windfall v2)
+---
+avpkg -d uses:
+-d ::: Downgrades system by 1 major version if possible (Windfall v1 <- Windfall v2)
+-d <pkg> ::: Downgrades specified package(s)
+---
+avpkg dnu uses:
+dnu ::: Lists packages on do-not-update list
+dnu -a <pkg> ::: Adds package(s) to do-not-update list
+dnu -r <pkg> ::: Removes package(s) from do-not-update list
+---
+avpkg -s ::: Searches repos for package(s)
+---
+avpkg -f ::: Attempts to find and fix issues
