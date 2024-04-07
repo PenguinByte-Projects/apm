@@ -206,6 +206,19 @@ func appendToShellConfig(configPath, pathToAppend string) {
         return
     }
 
+    // Read the file content
+    content, err := ioutil.ReadFile(configPath)
+    if err != nil {
+        fmt.Printf("Error reading %s: %v\n", configPath, err)
+        return
+    }
+
+    // Check if the path is already in the file
+    if strings.Contains(string(content), pathToAppend) {
+        fmt.Println("Already done.")
+        return
+    }
+
     // Append the path to the file
     f, err := os.OpenFile(configPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
     if err != nil {
