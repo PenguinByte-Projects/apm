@@ -223,7 +223,7 @@ func appendToShellConfig(configPath, pathToAppend string) {
 }
 
 
-func uninstallPackage(packageName string) {
+func uninstallPackage(packageName string, systemWide bool, userName string) {
 	packageDir := filepath.Join("/packages/repos", packageName)
 	if _, err := os.Stat(packageDir); os.IsNotExist(err) {
 		fmt.Printf("Package %s not found.\n", packageName)
@@ -243,10 +243,43 @@ func uninstallPackage(packageName string) {
 	}
 
 	if packageInfo.InstalledPath != "" {
-		newPath := strings.Replace(os.Getenv("PATH"), packageInfo.InstalledPath+string(os.PathListSeparator), "", 1)
-		os.Setenv("PATH", newPath)
+		// Determine the config path based on installation scope
+		var configPath string
+		if systemWide {
+			configPath = "/etc/profile"
+		} else if userName != "" {
+			configPath = fmt.Sprintf("/home/%s/.profile", userName)
+		} else {
+			fmt.Println("Invalid installation option.")
+			return
+		}
+
+		// Read the profile file
+		fileContent, err := ioutil.ReadFile(configPath)
+		if err != nil {
+			fmt.Printf("Error reading %s: %v\n", configPath, err)
+			return
+		}
+
+		// Prepare a new file content without the package's PATH addition
+		var newContent []string
+		scanner := bufio.NewScanner(strings.NewReader(string(fileContent)))
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !strings.Contains(line, packageInfo.InstalledPath) {
+				newContent = append(newContent, line)
+			}
+		}
+
+		// Write the modified content back to the file
+		if err := ioutil.WriteFile(configPath, []byte(strings.Join(newContent, "\n")), 0644); err != nil {
+			fmt.Printf("Error writing to %s: %v\n", configPath, err)
+			return
+		}
+
 		fmt.Printf("Removed %s from PATH.\n", packageInfo.InstalledPath)
 
+		// Remove the package directory
 		if err := os.RemoveAll(packageInfo.InstalledPath); err != nil {
 			fmt.Printf("Error removing %s: %v\n", packageInfo.InstalledPath, err)
 		} else {
@@ -363,6 +396,7 @@ func main() {
 	cloneFlag := flag.String("e", "", "URL of the repository to clone")
 	syncFlag := flag.Bool("sync", false, "Sync the repository")
 	reposListFlag := flag.String("repos", "", "Path to the list of repositories to sync")
+	uninstallFlag := flag.String("r", "", "Uninstalls package(s)") // New uninstall flag
 	flag.Parse()
 
 	if *listFlag {
@@ -396,10 +430,21 @@ func main() {
 				syncRepo(repoPath)
 			}
 		}
+	} else if *uninstallFlag != "" {
+		// Assuming systemWideFlag and userFlag are still relevant for uninstallation
+		// You might need to adjust this logic based on how you want to handle uninstallation
+		if *systemWideFlag {
+			uninstallPackage(*uninstallFlag, true, "") // Uninstall system-wide
+		} else if *userFlag != "" {
+			uninstallPackage(*uninstallFlag, false, *userFlag) // Uninstall for a specific user
+		} else {
+			fmt.Println("Invalid command. Use '-r <pkg> -s' for system-wide or '-r <pkg> -u <user>' for user-specific.")
+		}
 	} else {
-		fmt.Println("Invalid command. Use '-a <pkg>' to install or '-l' to list installed packages.")
+		fmt.Println("Invalid command. Use '-a <pkg>' to install, '-l' to list installed packages, or '-r <pkg>' to uninstall.")
 	}
-		if err := GenerateWorldFile(); err != nil {
+
+	if err := GenerateWorldFile(); err != nil {
 		fmt.Printf("Error generating world file: %v\n", err)
 	} else {
 		fmt.Println("World file generated successfully.")
