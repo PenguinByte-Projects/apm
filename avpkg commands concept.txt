@@ -1,4 +1,4 @@
-avpkg commands (concept):
+avpkg commands (updated, changes not yet implemented):
 
 avpkg -h, avpkg --help ::: Show options
 ---
