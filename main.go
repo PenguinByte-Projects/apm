@@ -8,15 +8,18 @@ import (
 	"io/ioutil"
 	"os"
 	"bufio"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"strings"
 )
 
 type PackageInfo struct {
+	Name        string   `json:"name"`
 	Dependencies    []string `json:"dependencies"`
 	InstallScript   string   `json:"install_script"`
 	InstalledPath   string   `json:"installed_path"`
+	Version     string   `json:"version"`
 }
 type Repository struct {
     RemoteURL string `json:"remoteURL"`
@@ -39,6 +42,28 @@ func readRepositories() ([]Repository, error) {
 
 func installPackage(packageName string, systemWide bool, userName string) {
 	packageDir := filepath.Join("/packages/repos/", packageName)
+		if _, err := os.Stat(packageDir); os.IsNotExist(err) {
+		fmt.Printf("Package %s not found.\n", packageName)
+		return
+	}
+
+	// Ensure the store directory exists
+	storeDir := filepath.Join("/packages/store/", packageName)
+	if _, err := os.Stat(storeDir); os.IsNotExist(err) {
+		err := os.MkdirAll(storeDir, 0755) // 0755 sets the permissions for the directory
+		if err != nil {
+			fmt.Println("Error creating directory:", err)
+			return
+		}
+	}
+
+	// Copy package.json to the store directory
+	src := filepath.Join(packageDir, "package.json")
+	dst := filepath.Join(storeDir, "package.json")
+	if err := copyFile(src, dst); err != nil {
+		fmt.Println("Error copying package.json:", err)
+		return
+	}
 	if _, err := os.Stat(packageDir); os.IsNotExist(err) {
 		fmt.Printf("Package %s not found.\n", packageName)
 		return
@@ -103,6 +128,55 @@ for _, dependency := range packageInfo.Dependencies {
     } else {
         fmt.Println("Installation successful, but 'installed_path' is not specified in package.json.")
     }
+}
+
+// copyFile copies the source file to the destination file.
+func copyFile(src, dst string) error {
+	sourceFileStat, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if !sourceFileStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", src)
+	}
+
+	source, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+
+	_, err = io.Copy(destination, source)
+	return err
+}
+func copyFileContents(src, dst string) (err error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return
+	}
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+	if _, err = io.Copy(out, in); err != nil {
+		return
+	}
+	err = out.Sync()
+	return
 }
 func listUsersWithHome() ([]string, error) {
     file, err := os.Open("/etc/passwd")
@@ -228,7 +302,59 @@ func syncRepo(repoPath string) {
 		fmt.Println("Repository synced successfully.")
 	}
 }
+//generate a world file
+// GenerateWorldFile generates a world file of installed packages.
+func GenerateWorldFile() error {
+	// Define the path to the world file.
+	worldFilePath := "/packages/world"
 
+	// Ensure the world file directory exists.
+	if err := os.MkdirAll(filepath.Dir(worldFilePath), 0755); err != nil {
+		return fmt.Errorf("failed to create world file directory: %w", err)
+	}
+
+	// Open the world file for writing.
+	worldFile, err := os.Create(worldFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to create world file: %w", err)
+	}
+	defer worldFile.Close()
+
+	// Traverse the /packages/store/ directory.
+	err = filepath.Walk("/packages/store/", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Check if the current item is a package.json file.
+		if info.Name() == "package.json" {
+			// Read and parse the package.json file.
+			data, err := ioutil.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("failed to read package.json: %w", err)
+			}
+
+			var pkgInfo PackageInfo
+			if err := json.Unmarshal(data, &pkgInfo); err != nil {
+				return fmt.Errorf("failed to parse package.json: %w", err)
+			}
+
+			// Write the package information to the world file.
+			_, err = worldFile.WriteString(fmt.Sprintf("%s %s %s\n", pkgInfo.Name, pkgInfo.Version, pkgInfo.InstalledPath))
+			if err != nil {
+				return fmt.Errorf("failed to write to world file: %w", err)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to traverse /packages/store/: %w", err)
+	}
+
+	return nil
+}
 func main() {
 	installFlag := flag.String("a", "", "Installs package(s)")
 	systemWideFlag := flag.Bool("s", false, "Install system-wide")
@@ -272,5 +398,10 @@ func main() {
 		}
 	} else {
 		fmt.Println("Invalid command. Use '-a <pkg>' to install or '-l' to list installed packages.")
+	}
+		if err := GenerateWorldFile(); err != nil {
+		fmt.Printf("Error generating world file: %v\n", err)
+	} else {
+		fmt.Println("World file generated successfully.")
 	}
 }
