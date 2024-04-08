@@ -1,6 +1,8 @@
 * Overview
 
-This program provides a command-line interface for managing software packages. It supports operations such as installing, removing, and listing packages, adding repositories, and syncing repositories. The program reads package information from JSON files and executes scripts for installation and uninstallation.
+Note: This is an experimental build of avpkg
+avpkg is a package manager built for the Project Windfall GNU/Linux distribution. It lets you install, remove, upgrade, downgrade, and manage repositories and software. You can also upgrade, downgrade, and manage your operating system with avpkg.
+avpkg reads package information from JSON files and runs scripts for package installation and removal.
 
 * Usage
 
