@@ -13,9 +13,10 @@ avpkg -i uses:
 -i <pkg> ::: Shows info about system or package(s)
 ---
 avpkg -a uses:
--a <pkg> ::: Installs package(s)
--a <pkg> -v <ver> ::: Installs specified version of package(s)
+-a <pkg> ::: Installs package(s) (for logged-in user only)
+-a <pkg> -v <ver> ::: Installs specified version of package(s) (for logged-in user only)
 -a -s <pkg> ::: Installs package(s) system-wide
+-a -s <pkg> -v <ver> ::: Installs specified version of package(s) system-wide
 ---
 avpkg -t /<filepath>/<pkg.tar> ::: Installs tar package(s)
 ---
