@@ -15,7 +15,7 @@ avpkg -i uses:
 avpkg -a uses:
 -a <pkg> ::: Installs package(s)
 -a <pkg> -v <ver> ::: Installs specified version of package(s)
--a -sw <pkg> ::: Only available as administrator | Installs package(s) for the logged in administrator and users managed by current administrator
+-a -s <pkg> ::: Only available as administrator | Installs package(s) for the logged in administrator and users managed by current administrator
 ---
 avpkg -t /<filepath>/<pkg.tar> ::: Installs tar package(s)
 ---
