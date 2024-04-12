@@ -123,25 +123,38 @@ func installPackage(packageName string, systemWide bool, userName string) {
         return
     }
     
-    configContent, err := ioutil.ReadFile("/packages/config")
+     configContent, err := ioutil.ReadFile("/packages/config")
     if err != nil {
         panic(err)
     }
 
+    // Step 2: Read the original install script
     scriptPath := filepath.Join(packageDir, packageInfo.InstallScript)
     scriptContent, err := ioutil.ReadFile(scriptPath)
     if err != nil {
         panic(err)
     }
 
-    modifiedScript := append(configContent, scriptContent...)
+    // Step 3: Create a temporary file named `real_install.sh`
+    tempScriptPath := filepath.Join(filepath.Dir(scriptPath), "real_install.sh")
+    tempScriptFile, err := os.Create(tempScriptPath)
+    if err != nil {
+        panic(err)
+    }
+    defer tempScriptFile.Close()
 
-    err = ioutil.WriteFile(scriptPath, modifiedScript, 0644)
+    // Step 4: Prepend the config content to the script content
+    _, err = tempScriptFile.Write(configContent)
+    if err != nil {
+        panic(err)
+    }
+    _, err = tempScriptFile.Write(scriptContent)
     if err != nil {
         panic(err)
     }
 
-    cmd := exec.Command("sh", scriptPath, filepath.Join(packageDir, "package.json"), packageDir)
+    // Step 5: Run the modified script
+    cmd := exec.Command("sh", tempScriptPath, filepath.Join(packageDir, "package.json"), packageDir)
     cmd.Stdout = os.Stdout
     cmd.Stderr = os.Stderr
     err = cmd.Run()
@@ -332,7 +345,7 @@ func uninstallPackage(packageName string, systemWide bool, userName string) {
 		// Determine the config path based on installation scope
 		var configPath string
 		if systemWide {
-			configPath = "/etc/profile"
+			configPath = "/root/.profile"
 		} else if userName != "" {
 			configPath = fmt.Sprintf("/home/%s/.profile", userName)
 		} else {
