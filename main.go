@@ -10,6 +10,9 @@ import (
 	"bufio"
 	"io"
 	"os/exec"
+	"syscall"
+	"os/user"
+	"strconv"
 	"path/filepath"
 	"strings"
 )
@@ -40,91 +43,128 @@ func readRepositories() ([]Repository, error) {
     return repositories, nil
 }
 
+
 func installPackage(packageName string, systemWide bool, userName string) {
-	packageDir := filepath.Join("/packages/repos/", packageName)
-		if _, err := os.Stat(packageDir); os.IsNotExist(err) {
-		fmt.Printf("Package %s not found.\n", packageName)
-		return
-	}
-
-	// Ensure the store directory exists
-	storeDir := filepath.Join("/packages/store/", packageName)
-	if _, err := os.Stat(storeDir); os.IsNotExist(err) {
-		err := os.MkdirAll(storeDir, 0755) // 0755 sets the permissions for the directory
-		if err != nil {
-			fmt.Println("Error creating directory:", err)
-			return
-		}
-	}
-
-	// Copy package.json to the store directory
-	src := filepath.Join(packageDir, "package.json")
-	dst := filepath.Join(storeDir, "package.json")
-	if err := copyFile(src, dst); err != nil {
-		fmt.Println("Error copying package.json:", err)
-		return
-	}
-	if _, err := os.Stat(packageDir); os.IsNotExist(err) {
-		fmt.Printf("Package %s not found.\n", packageName)
-		return
-	}
-
-	packageInfoBytes, err := ioutil.ReadFile(filepath.Join(packageDir, "package.json"))
-	if err != nil {
-		fmt.Println("Error reading package.json:", err)
-		return
-	}
-
-	var packageInfo PackageInfo
-	if err := json.Unmarshal(packageInfoBytes, &packageInfo); err != nil {
-		fmt.Println("Error parsing package.json:", err)
-		return
-	}
-
-for _, dependency := range packageInfo.Dependencies {
-    // Assuming dependencies should be installed with the same scope as the parent package
-    // If the parent installation is user-specific, install dependencies for the same user
-    // If the parent installation is system-wide, install dependencies system-wide
-    if userName != "" {
-        installPackage(dependency, false, userName)
-    } else {
-        installPackage(dependency, true, "")
+    packageDir := filepath.Join("/packages/repos/", packageName)
+    if _, err := os.Stat(packageDir); os.IsNotExist(err) {
+        fmt.Printf("Package %s not found.\n", packageName)
+        return
     }
-}
 
-
-	if packageInfo.InstallScript == "" {
-		fmt.Printf("No install script specified for package %s.\n", packageName)
-		return
-	}
-
-	// Assuming the install script is a shell script that can be executed directly
-	// This is a simplification; in a real-world scenario, you might need to handle this differently
-	scriptPath := filepath.Join(packageDir, packageInfo.InstallScript)
-	cmd := exec.Command("sh", scriptPath, filepath.Join(packageDir, "package.json"), packageDir)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("Installation of %s failed: %v\n", packageName, err)
-		return
-	}
-
- 
-    if packageInfo.InstalledPath != "" {
-        var configPath string
-        if systemWide {
-            configPath = "/etc/profile"
-        } else if userName != "" {
-            configPath = fmt.Sprintf("/home/%s/.profile", userName)
-        } else {
-            fmt.Println("Invalid installation option.")
+    // Ensure the store directory exists
+    storeDir := filepath.Join("/packages/store/", packageName)
+    if _, err := os.Stat(storeDir); os.IsNotExist(err) {
+        err := os.MkdirAll(storeDir, 0755) // 0755 sets the permissions for the directory
+        if err != nil {
+            fmt.Println("Error creating directory:", err)
             return
         }
+    }
 
-        // Append to the chosen shell config file
-        appendToShellConfig(configPath, packageInfo.InstalledPath)
-        fmt.Printf("Successfully added %s to PATH.\n", packageInfo.InstalledPath)
+    // Copy package.json to the store directory
+    src := filepath.Join(packageDir, "package.json")
+    dst := filepath.Join(storeDir, "package.json")
+    if err := copyFile(src, dst); err != nil {
+        fmt.Println("Error copying package.json:", err)
+        return
+    }
+
+    packageInfoBytes, err := ioutil.ReadFile(filepath.Join(packageDir, "package.json"))
+    if err != nil {
+        fmt.Println("Error reading package.json:", err)
+        return
+    }
+
+    var packageInfo PackageInfo
+    if err := json.Unmarshal(packageInfoBytes, &packageInfo); err != nil {
+        fmt.Println("Error parsing package.json:", err)
+        return
+    }
+
+    for _, dependency := range packageInfo.Dependencies {
+        installPackage(dependency, false, "userName") // Always install dependencies as avpkg
+    }
+
+    if packageInfo.InstallScript == "" {
+        fmt.Printf("No install script specified for package %s.\n", packageName)
+        return
+    }
+    
+    configContent, err := ioutil.ReadFile("/packages/config")
+    if err != nil {
+        panic(err)
+    }
+
+    scriptPath := filepath.Join(packageDir, packageInfo.InstallScript)
+    scriptContent, err := ioutil.ReadFile(scriptPath)
+    if err != nil {
+        panic(err)
+    }
+
+    modifiedScript := append(configContent, scriptContent...)
+
+    err = ioutil.WriteFile(scriptPath, modifiedScript, 0644)
+    if err != nil {
+        panic(err)
+    }
+
+    cmd := exec.Command("sh", scriptPath, filepath.Join(packageDir, "package.json"), packageDir)
+    cmd.Stdout = os.Stdout
+    cmd.Stderr = os.Stderr
+    err = cmd.Run()
+    if err != nil {
+        panic(err)
+    }
+    // scriptPath := filepath.Join(packageDir, packageInfo.InstallScript)
+    // cmd := exec.Command("sh", scriptPath, filepath.Join(packageDir, "package.json"), packageDir)
+    // cmd.Stdout = os.Stdout
+    // cmd.Stderr = os.Stderr
+
+    // Set the UID and GID for the command to match the avpkg user
+    avpkgUser, err := user.Lookup("avpkg")
+    if err != nil {
+        fmt.Printf("Error looking up user 'avpkg': %v\n", err)
+        return
+    }
+
+    uid, err := strconv.Atoi(avpkgUser.Uid)
+    if err != nil {
+        fmt.Printf("Error converting UID to integer: %v\n", err)
+        return
+    }
+
+    gid, err := strconv.Atoi(avpkgUser.Gid)
+    if err != nil {
+        fmt.Printf("Error converting GID to integer: %v\n", err)
+        return
+    }
+
+    cmd.SysProcAttr = &syscall.SysProcAttr{
+        Credential: &syscall.Credential{
+            Uid: uint32(uid),
+            Gid: uint32(gid),
+        },
+    }
+
+    if err := cmd.Run(); err != nil {
+        fmt.Printf("Installation of %s failed: %v\n", packageName, err)
+        return
+    }
+
+    if packageInfo.InstalledPath != "" {
+        // Append to the shell config of the user specified by userName
+        if userName != "" {
+            userInfo, err := user.Lookup(userName)
+            if err != nil {
+                fmt.Printf("Error looking up user '%s': %v\n", userName, err)
+                return
+            }
+            configPath := fmt.Sprintf("/home/%s/.profile", userInfo.Username) // Assuming the user's home directory is /home/username
+            appendToShellConfig(configPath, packageInfo.InstalledPath)
+            fmt.Printf("Successfully added %s to PATH for user %s.\n", packageInfo.InstalledPath, userName)
+        } else {
+            fmt.Println("No user specified for appending to shell config.")
+        }
     } else {
         fmt.Println("Installation successful, but 'installed_path' is not specified in package.json.")
     }
