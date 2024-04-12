@@ -22,6 +22,7 @@ type PackageInfo struct {
 	Dependencies    []string `json:"dependencies"`
 	InstallScript   string   `json:"install_script"`
 	InstalledPath   string   `json:"installed_path"`
+	User string `json:"user"`
 	Version     string   `json:"version"`
 }
 type Repository struct {
@@ -69,6 +70,7 @@ func installPackage(packageName string, systemWide bool, userName string) {
         return
     }
 
+
     packageInfoBytes, err := ioutil.ReadFile(filepath.Join(packageDir, "package.json"))
     if err != nil {
         fmt.Println("Error reading package.json:", err)
@@ -80,9 +82,40 @@ func installPackage(packageName string, systemWide bool, userName string) {
         fmt.Println("Error parsing package.json:", err)
         return
     }
+        // Read the copied package.json
+    packageInfoBytes, err = ioutil.ReadFile(dst)
+    if err != nil {
+        fmt.Println("Error reading package.json:", err)
+        return
+    }
 
+    // Unmarshal the JSON into a PackageInfo struct
+    if err := json.Unmarshal(packageInfoBytes, &packageInfo); err != nil {
+        fmt.Println("Error parsing package.json:", err)
+        return
+    }
+
+    // Set the "user" field based on the systemWide flag or userName
+    if systemWide {
+        packageInfo.User = "system-wide"
+    } else if userName != "" {
+        packageInfo.User = userName
+    }
+
+    // Marshal the modified PackageInfo back to JSON
+    modifiedPackageInfoBytes, err := json.MarshalIndent(packageInfo, "", " ")
+    if err != nil {
+        fmt.Println("Error marshaling package.json:", err)
+        return
+    }
+
+    // Write the modified JSON back to package.json in the store directory
+    if err := ioutil.WriteFile(dst, modifiedPackageInfoBytes, 0644); err != nil {
+        fmt.Println("Error writing modified package.json:", err)
+        return
+    }
     for _, dependency := range packageInfo.Dependencies {
-        installPackage(dependency, false, "userName") // Always install dependencies as avpkg
+        installPackage(dependency, false, userName) 
     }
 
     if packageInfo.InstallScript == "" {
@@ -390,6 +423,7 @@ func syncRepo(repoPath string) {
 }
 //generate a world file
 // GenerateWorldFile generates a world file of installed packages.
+
 func GenerateWorldFile() error {
 	// Define the path to the world file.
 	worldFilePath := "/packages/world"
@@ -425,8 +459,8 @@ func GenerateWorldFile() error {
 				return fmt.Errorf("failed to parse package.json: %w", err)
 			}
 
-			// Write the package information to the world file.
-			_, err = worldFile.WriteString(fmt.Sprintf("%s %s %s\n", pkgInfo.Name, pkgInfo.Version, pkgInfo.InstalledPath))
+			// Write the package information and user to the world file.
+			_, err = worldFile.WriteString(fmt.Sprintf("%s %s %s %s\n", pkgInfo.Name, pkgInfo.Version, pkgInfo.InstalledPath, pkgInfo.User))
 			if err != nil {
 				return fmt.Errorf("failed to write to world file: %w", err)
 			}
